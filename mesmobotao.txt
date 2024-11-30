@@ -1,0 +1,94 @@
+#include <WiFi.h>
+#include <HTTPClient.h>
+#include <UrlEncode.h>
+
+const char* ssid = "Starlink_CIT";
+char* password = "Ufrr@2024Cit";
+
+// Definição dos pinos do botão e LEDs
+#define botao_21 21  // Botão para alternar entre iniciar/parar o piscar do LED
+#define led1 23      // LED que pisca
+#define led2 2       // LED de status
+
+bool ledPiscar = false;   // Controle para o estado de piscar do LED
+bool botaoPressionado = false; // Controle para detectar mudança no botão
+
+// Número de telefone e chave da API para CallMeBot
+String phoneNumber1 = "559591612080";       // Número de telefone para enviar mensagem (Brasil 55) Exemplo : 5595991441665 
+String apiKey1 = "2597956";                 // Chave de API para autenticação no CallMeBot, é dada pelo whats CallMeBot após enviar a mensagem : "I allow callmebot to send me messages" 
+String phoneNumber2 = "559591322523";       // Número de telefone para enviar mensagem (Brasil 55) Exemplo : 5595991441665 
+String apiKey2 = "7113076";
+
+// Função para enviar a mensagem via CallMeBot API
+void sendMessage(String phoneNumber, String apiKey, String message) {
+  String url = "http://api.callmebot.com/whatsapp.php?phone=" + phoneNumber + "&apikey=" + apiKey + "&text=" + urlEncode(message);
+  HTTPClient http;
+  http.begin(url);
+  http.addHeader("Content-Type", "application/x-www-form-urlencoded");
+  int httpResponseCode = http.POST(url);
+  if (httpResponseCode == 200) {
+    Serial.println("Mensagem enviada com sucesso");
+  } else {
+    Serial.println("Erro no envio da mensagem");
+    Serial.print("HTTP response code: ");
+    Serial.println(httpResponseCode);
+  }
+  http.end();
+}
+
+void setup() {
+  Serial.begin(115200);
+
+  pinMode(botao_21, INPUT_PULLUP);
+  pinMode(led1, OUTPUT);
+  pinMode(led2, OUTPUT);
+  
+  digitalWrite(led1, LOW);
+  digitalWrite(led2, LOW);
+
+  WiFi.begin(ssid, password);
+  Serial.println("Conectando...");
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+    digitalWrite(led2, !digitalRead(led2));
+  }
+  Serial.println("");
+  Serial.println("Conectado ao WiFi.");
+  digitalWrite(led2, HIGH);
+}
+
+void loop() {
+  int estado_botao_21 = digitalRead(botao_21);
+
+  // Detecta transição do botão (pressionado e liberado)
+  if (estado_botao_21 == LOW && !botaoPressionado) {
+    botaoPressionado = true; // Marca que o botão foi pressionado
+
+    // Alterna o estado do LED entre piscar e parar
+    if (!ledPiscar) {
+      Serial.println("Botão pressionado: ativando piscar e enviando mensagem.");
+      sendMessage(phoneNumber1, apiKey1, "SOCORRO!!!! ME AJUDE");
+      sendMessage(phoneNumber2, apiKey2, "SOCORRO!!!! ME AJUDE");
+      ledPiscar = true;
+    } else {
+      Serial.println("Botão pressionado: desativando piscar.");
+      ledPiscar = false;
+      digitalWrite(led1, LOW);
+    }
+  }
+
+  // Reseta a marcação quando o botão é liberado
+  if (estado_botao_21 == HIGH && botaoPressionado) {
+    botaoPressionado = false;
+  }
+
+  // Piscar do LED
+  if (ledPiscar) {
+    static unsigned long lastMillis = 0;
+    if (millis() - lastMillis >= 500) { // Alterna o estado a cada 500ms
+      lastMillis = millis();
+      digitalWrite(led1, !digitalRead(led1));
+    }
+  }
+}
